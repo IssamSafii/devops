@@ -121,6 +121,7 @@ pipeline {
                     echo "===== BACKEND LOGS ====="
                     docker logs backend-app
                 '''
+                echo 'all good'
             }
         }
     }
