@@ -2,15 +2,9 @@
 pipeline {
     agent any
 
-    tools {
-        jdk 'JDK17'
-        maven 'Maven3'
-    }
-
     stages {
-
         stage('GIT') {
-               steps {
+            steps {
                 echo 'Checkout du projet depuis GitHub'
                 checkout scm
             }
@@ -19,6 +13,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Compilation du projet'
+                sh 'java -version && mvn -version'
                 sh 'mvn clean compile'
             }
         }
@@ -33,7 +28,6 @@ pipeline {
         stage('SonarQube') {
             steps {
                 echo 'Analyse SonarQube'
-
                 withSonarQubeEnv('SonarQube') {
                     sh 'mvn sonar:sonar'
                 }
@@ -43,7 +37,6 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 echo 'Verification Quality Gate'
-
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
@@ -53,7 +46,6 @@ pipeline {
         stage('Package') {
             steps {
                 echo 'Creation du fichier JAR'
-
                 sh 'mvn package -DskipTests'
 
                 archiveArtifacts artifacts: 'target/*.jar',
