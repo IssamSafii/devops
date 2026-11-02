@@ -39,13 +39,11 @@ pipeline {
         }
     }
 }
-
-
-
-stage('SonarQube') {
-    steps {
-        dir('backend') {
-            echo 'Analyse du code avec SonarQube'
+    
+        stage('SonarQube') {
+            steps {
+                dir('backend') {
+                echo 'Analyse du code avec SonarQube'
 
             withSonarQubeEnv('sq1') {
                 sh '''
@@ -56,6 +54,7 @@ stage('SonarQube') {
         }
     }
 }
+
 
 
         stage('Quality Gate') {
