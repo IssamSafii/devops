@@ -41,16 +41,22 @@ pipeline {
 }
 
 
-        stage('SonarQube') {
-            steps {
-                dir('backend') {
-                    echo 'Analyse du code avec SonarQube'
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar'
-                    }
-                }
+
+stage('SonarQube') {
+    steps {
+        dir('backend') {
+            echo 'Analyse du code avec SonarQube'
+
+            withSonarQubeEnv('sq1') {
+                sh '''
+                    mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                        -Dsonar.projectKey=votre-projet-Spring-Boot
+                '''
             }
         }
+    }
+}
+
 
         stage('Quality Gate') {
             steps {
