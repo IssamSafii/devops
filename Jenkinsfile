@@ -5,38 +5,43 @@ pipeline {
     stages {
         stage('GIT') {
             steps {
-                echo 'Checkout du projet depuis GitHub'
+                echo 'Recuperation du code depuis GitHub'
                 checkout scm
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Compilation du projet'
-                sh 'java -version && mvn -version'
-                sh 'mvn clean compile'
+                dir('backend') {
+                    echo 'Compilation du projet Spring Boot'
+                    sh 'mvn clean compile'
+                }
             }
         }
 
         stage('Tests') {
             steps {
-                echo 'Execution des tests unitaires'
-                sh 'mvn test'
+                dir('backend') {
+                    echo 'Execution des tests unitaires'
+                    sh 'mvn test'
+                }
             }
         }
 
         stage('SonarQube') {
             steps {
-                echo 'Analyse SonarQube'
-                withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar'
+                dir('backend') {
+                    echo 'Analyse du code avec SonarQube'
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'mvn sonar:sonar'
+                    }
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                echo 'Verification Quality Gate'
+                echo 'Verification du Quality Gate'
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
@@ -45,10 +50,12 @@ pipeline {
 
         stage('Package') {
             steps {
-                echo 'Creation du fichier JAR'
-                sh 'mvn package -DskipTests'
+                dir('backend') {
+                    echo 'Creation du fichier JAR'
+                    sh 'mvn package -DskipTests'
+                }
 
-                archiveArtifacts artifacts: 'target/*.jar',
+                archiveArtifacts artifacts: 'backend/target/*.jar',
                                  fingerprint: true
             }
         }
