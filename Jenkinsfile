@@ -1,128 +1,74 @@
+
 pipeline {
     agent any
 
-    environment {
-        DOCKER_IMAGE = 'issamsafi/backend-app:latest'
+    tools {
+        jdk 'JDK17'
+        maven 'Maven3'
     }
 
     stages {
 
-        stage('Git') {
-            steps {
+        stage('GIT') {
+               steps {
                 echo 'Checkout du projet depuis GitHub'
                 checkout scm
             }
         }
 
-        stage('Maven Build') {
+        stage('Build') {
             steps {
-                echo 'Build Maven du backend'
+                echo 'Compilation du projet'
+                sh 'mvn clean compile'
+            }
+        }
 
-                dir('backend') {
-                    sh 'mvn clean package -DskipTests'
+        stage('Tests') {
+            steps {
+                echo 'Execution des tests unitaires'
+                sh 'mvn test'
+            }
+        }
+
+        stage('SonarQube') {
+            steps {
+                echo 'Analyse SonarQube'
+
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
                 }
             }
         }
 
-        stage('Docker Build') {
+        stage('Quality Gate') {
             steps {
-                echo 'Construction de image backend-app'
+                echo 'Verification Quality Gate'
 
-                dir('backend') {
-                    sh 'docker build -t backend-app:latest .'
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('Docker Push') {
+        stage('Package') {
             steps {
-                echo 'Publication de image sur Docker Hub'
+                echo 'Creation du fichier JAR'
 
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-registry-credentials',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin
+                sh 'mvn package -DskipTests'
 
-                        docker tag backend-app:latest $DOCKER_IMAGE
-
-                        docker push $DOCKER_IMAGE
-
-                        docker logout
-                    '''
-                }
+                archiveArtifacts artifacts: 'target/*.jar',
+                                 fingerprint: true
             }
         }
+    }
 
-        stage('Deploy MySQL') {
-            steps {
-                echo 'Lancement du conteneur MySQL'
-
-                sh '''
-                    docker rm -f mysql || true
-
-                    docker network inspect devops-network >/dev/null 2>&1 || \
-                    docker network create devops-network
-
-                    docker run -d \
-                        --name mysql \
-                        --network devops-network \
-                        -e MYSQL_ROOT_PASSWORD=root \
-                        -e MYSQL_DATABASE=test_db \
-                        mysql:8.0
-
-                    echo "Attente du démarrage de MySQL..."
-
-                    until docker exec mysql mysqladmin ping -h localhost -uroot -proot --silent
-                    do
-                        sleep 5
-                    done
-
-                    echo "MySQL est prêt"
-                '''
-            }
+    post {
+        success {
+            echo 'Pipeline termine avec succes !'
         }
 
-        stage('Deploy Backend') {
-            steps {
-                echo 'Déploiement du backend'
-
-                sh '''
-                    docker rm -f backend-app || true
-
-                    docker pull $DOCKER_IMAGE
-
-                    docker run -d \
-                        --name backend-app \
-                        --network devops-network \
-                        -p 8081:8080 \
-                        -e SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/test_db?createDatabaseIfNotExist=true" \
-                        -e SPRING_DATASOURCE_USERNAME=root \
-                        -e SPRING_DATASOURCE_PASSWORD=root \
-                        $DOCKER_IMAGE
-                '''
-            }
-        }
-
-        stage('Verification') {
-            steps {
-                echo 'Vérification du déploiement'
-
-                sh '''
-                    sleep 15
-
-                    echo "===== DOCKER PS ====="
-                    docker ps
-
-                    echo "===== BACKEND LOGS ====="
-                    docker logs backend-app
-                '''
-                echo 'all good'
-            }
+        failure {
+            echo 'Echec du pipeline !'
         }
     }
 }
