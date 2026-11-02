@@ -19,14 +19,27 @@ pipeline {
             }
         }
 
+        
         stage('Tests') {
             steps {
                 dir('backend') {
-                    echo 'Execution des tests unitaires'
+                withCredentials([
+                usernamePassword(
+                    credentialsId: 'mysql-credentials',
+                    usernameVariable: 'DB_USERNAME',
+                    passwordVariable: 'DB_PASSWORD'
+                )
+            ]) {
+                withEnv([
+                    'DB_URL=jdbc:mysql://172.18.0.2:3306/test_db?createDatabaseIfNotExist=true'
+                ]) {
                     sh 'mvn test'
                 }
             }
         }
+    }
+}
+
 
         stage('SonarQube') {
             steps {
